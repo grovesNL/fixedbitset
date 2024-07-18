@@ -1319,17 +1319,23 @@ fn count_consecutive_zero_run_lower() {
     fb.insert_range(14..346);
     fb.insert_range(453..632);
 
-    assert_eq!(fb.count_consecutive_zero_run_lower(5), 6);
-    assert_eq!(fb.count_consecutive_zero_run_lower(346), 1);
-    assert_eq!(fb.count_consecutive_zero_run_lower(452), 107);
-    assert_eq!(fb.count_consecutive_zero_run_lower(453), 0);
-    assert_eq!(fb.count_consecutive_zero_run_lower(620), 0);
+    assert_eq!(fb.count_consecutive_zero_run_lower(5, None), 6);
+    assert_eq!(fb.count_consecutive_zero_run_lower(346, None), 1);
+    assert_eq!(fb.count_consecutive_zero_run_lower(452, None), 107);
+    assert_eq!(fb.count_consecutive_zero_run_lower(453, None), 0);
+    assert_eq!(fb.count_consecutive_zero_run_lower(620, None), 0);
 }
 
 #[test]
 fn count_consecutive_zero_run_lower_at_boundary() {
     let fb = FixedBitSet::with_capacity(256);
-    assert_eq!(fb.count_consecutive_zero_run_lower(127), 128);
+    assert_eq!(fb.count_consecutive_zero_run_lower(127, None), 128);
+}
+
+#[test]
+fn count_consecutive_zero_run_lower_with_stop() {
+    let fb = FixedBitSet::with_capacity(256);
+    assert_eq!(fb.count_consecutive_zero_run_lower(200, Some(0)), 201);
 }
 
 #[test]
@@ -1339,17 +1345,23 @@ fn count_consecutive_zero_run_higher() {
     fb.insert_range(14..346);
     fb.insert_range(453..632);
 
-    assert_eq!(fb.count_consecutive_zero_run_higher(12), 2);
-    assert_eq!(fb.count_consecutive_zero_run_higher(346), 107);
-    assert_eq!(fb.count_consecutive_zero_run_higher(452), 1);
-    assert_eq!(fb.count_consecutive_zero_run_higher(453), 0);
-    assert_eq!(fb.count_consecutive_zero_run_higher(620), 0);
+    assert_eq!(fb.count_consecutive_zero_run_higher(12, None), 2);
+    assert_eq!(fb.count_consecutive_zero_run_higher(346, None), 107);
+    assert_eq!(fb.count_consecutive_zero_run_higher(452, None), 1);
+    assert_eq!(fb.count_consecutive_zero_run_higher(453, None), 0);
+    assert_eq!(fb.count_consecutive_zero_run_higher(620, None), 0);
 }
 
 #[test]
 fn count_consecutive_zero_run_higher_at_boundary() {
     let fb = FixedBitSet::with_capacity(256);
-    assert_eq!(fb.count_consecutive_zero_run_higher(64), 192);
+    assert_eq!(fb.count_consecutive_zero_run_higher(64, None), 192);
+}
+
+#[test]
+fn count_consecutive_zero_run_higher_with_stop() {
+    let fb = FixedBitSet::with_capacity(256);
+    assert_eq!(fb.count_consecutive_zero_run_higher(0, Some(200)), 201);
 }
 
 #[test]
@@ -1358,10 +1370,10 @@ fn count_consecutive_one_run_lower() {
 
     fb.insert_range(14..346);
 
-    assert_eq!(fb.count_consecutive_one_run_lower(17), 4);
-    assert_eq!(fb.count_consecutive_one_run_lower(135), 122);
-    assert_eq!(fb.count_consecutive_one_run_lower(2), 0);
-    assert_eq!(fb.count_consecutive_one_run_lower(500), 0);
+    assert_eq!(fb.count_consecutive_one_run_lower(17, None), 4);
+    assert_eq!(fb.count_consecutive_one_run_lower(135, None), 122);
+    assert_eq!(fb.count_consecutive_one_run_lower(2, None), 0);
+    assert_eq!(fb.count_consecutive_one_run_lower(500, None), 0);
 }
 
 #[test]
@@ -1370,8 +1382,8 @@ fn count_consecutive_one_run_higher() {
 
     fb.insert_range(14..346);
 
-    assert_eq!(fb.count_consecutive_one_run_higher(343), 3);
-    assert_eq!(fb.count_consecutive_one_run_higher(17), 329);
-    assert_eq!(fb.count_consecutive_one_run_higher(2), 0);
-    assert_eq!(fb.count_consecutive_one_run_higher(500), 0);
+    assert_eq!(fb.count_consecutive_one_run_higher(343, None), 3);
+    assert_eq!(fb.count_consecutive_one_run_higher(17, None), 329);
+    assert_eq!(fb.count_consecutive_one_run_higher(2, None), 0);
+    assert_eq!(fb.count_consecutive_one_run_higher(500, None), 0);
 }

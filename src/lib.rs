@@ -635,10 +635,24 @@ impl FixedBitSet {
         }))
     }
 
-    fn count_consecutive_lower_inner<C: CountConsecutiveBits>(&self, start: usize) -> usize {
+    #[inline]
+    fn count_consecutive_lower_inner<C: CountConsecutiveBits>(
+        &self,
+        start: usize,
+        stop: Option<usize>,
+    ) -> usize {
+        if let Some(stop) = stop {
+            assert!(
+                stop < start,
+                "start index {} is less than stop index {}",
+                start,
+                stop
+            );
+        }
+
         assert!(
             start < self.length,
-            "count_consecutive_ones_lower at index {} exceeds fixedbitset size {}",
+            "index {} exceeds fixedbitset size {}",
             start,
             self.length
         );
@@ -651,6 +665,7 @@ impl FixedBitSet {
         let (start_block, start_rem) = div_rem(start, BITS);
         let mut count = 0;
         let mut rem = start_rem as u32;
+        let max_allowed = start - stop.unwrap_or(0);
 
         for block in (0..start_block + 1).rev() {
             // SAFETY: Start is in range, so block index is also in range.
@@ -679,6 +694,11 @@ impl FixedBitSet {
 
             count += element_count as usize;
 
+            if count >= max_allowed {
+                // We found enough bits to reach the stop index.
+                return max_allowed;
+            }
+
             if element_count != max_possible_bits_to_add {
                 // We found a toggled bit that ended the run.
                 break;
@@ -688,10 +708,24 @@ impl FixedBitSet {
         count
     }
 
-    fn count_consecutive_higher_inner<C: CountConsecutiveBits>(&self, start: usize) -> usize {
+    #[inline]
+    fn count_consecutive_higher_inner<C: CountConsecutiveBits>(
+        &self,
+        start: usize,
+        stop: Option<usize>,
+    ) -> usize {
+        if let Some(stop) = stop {
+            assert!(
+                start < stop,
+                "start index {} is greater than stop index {}",
+                start,
+                stop
+            );
+        }
+
         assert!(
             start < self.length,
-            "count_consecutive_ones_higher at index {} exceeds fixedbitset size {}",
+            "index {} exceeds fixedbitset size {}",
             start,
             self.length
         );
@@ -701,6 +735,13 @@ impl FixedBitSet {
         let (start_block, start_rem) = div_rem(start, BITS);
         let mut count = 0;
         let mut rem = start_rem as u32;
+        let max_allowed = stop
+            .map(|stop| {
+                // Include stop in the count.
+                stop.saturating_add(1)
+            })
+            .unwrap_or(self.length)
+            - start;
 
         for block in start_block..self.usize_len() {
             // SAFETY: Start is in range, so block index is also in range.
@@ -729,6 +770,11 @@ impl FixedBitSet {
 
             count += element_count as usize;
 
+            if count >= max_allowed {
+                // We found enough bits to reach the stop index.
+                return max_allowed;
+            }
+
             if element_count != max_possible_bits_to_add {
                 // We found a toggled bit that ended the run.
                 break;
@@ -741,29 +787,33 @@ impl FixedBitSet {
     /// Count the number of unset bits from `start` to the first lower set bit.
     ///
     /// **Panics** if `start` is out of bounds.
-    pub fn count_consecutive_zero_run_lower(&self, start: usize) -> usize {
-        self.count_consecutive_lower_inner::<CountConsecutiveZeroBits>(start)
+    #[inline]
+    pub fn count_consecutive_zero_run_lower(&self, start: usize, stop: Option<usize>) -> usize {
+        self.count_consecutive_lower_inner::<CountConsecutiveZeroBits>(start, stop)
     }
 
     /// Count the number of unset bits from `start` to the first higher set bit.
     ///
     /// **Panics** if `start` is out of bounds.
-    pub fn count_consecutive_zero_run_higher(&self, start: usize) -> usize {
-        self.count_consecutive_higher_inner::<CountConsecutiveZeroBits>(start)
+    #[inline]
+    pub fn count_consecutive_zero_run_higher(&self, start: usize, stop: Option<usize>) -> usize {
+        self.count_consecutive_higher_inner::<CountConsecutiveZeroBits>(start, stop)
     }
 
     /// Count the number of set bits from `start` to the first lower unset bit.
     ///
     /// **Panics** if `start` is out of bounds.
-    pub fn count_consecutive_one_run_lower(&self, start: usize) -> usize {
-        self.count_consecutive_lower_inner::<CountConsecutiveOneBits>(start)
+    #[inline]
+    pub fn count_consecutive_one_run_lower(&self, start: usize, stop: Option<usize>) -> usize {
+        self.count_consecutive_lower_inner::<CountConsecutiveOneBits>(start, stop)
     }
 
     /// Count the number of set bits from `start` to the first higher unset bit.
     ///
     /// **Panics** if `start` is out of bounds.
-    pub fn count_consecutive_one_run_higher(&self, start: usize) -> usize {
-        self.count_consecutive_higher_inner::<CountConsecutiveOneBits>(start)
+    #[inline]
+    pub fn count_consecutive_one_run_higher(&self, start: usize, stop: Option<usize>) -> usize {
+        self.count_consecutive_higher_inner::<CountConsecutiveOneBits>(start, stop)
     }
 
     /// Sets every bit in the given range to the given state (`enabled`)
