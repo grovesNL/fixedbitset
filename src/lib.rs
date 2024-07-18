@@ -40,6 +40,8 @@ use core::ptr::NonNull;
 pub use range::IndexRange;
 
 pub(crate) const BITS: usize = core::mem::size_of::<Block>() * 8;
+const BITS_U32: u32 = BITS as u32;
+
 #[cfg(feature = "serde")]
 pub(crate) const BYTES: usize = core::mem::size_of::<Block>();
 
@@ -631,6 +633,137 @@ impl FixedBitSet {
             // SAFETY: Masks cannot return a block index that is out of range.
             unsafe { !*self.get_unchecked(block) & mask }
         }))
+    }
+
+    fn count_consecutive_lower_inner<C: CountConsecutiveBits>(&self, start: usize) -> usize {
+        assert!(
+            start < self.length,
+            "count_consecutive_ones_lower at index {} exceeds fixedbitset size {}",
+            start,
+            self.length
+        );
+
+        // Move start to the next bit to include it in the count.
+        let Some(start) = start.checked_add(1) else {
+            return 0;
+        };
+
+        let (start_block, start_rem) = div_rem(start, BITS);
+        let mut count = 0;
+        let mut rem = start_rem as u32;
+
+        for block in (0..start_block + 1).rev() {
+            // SAFETY: Start is in range, so block index is also in range.
+            let mut elt = unsafe { *self.get_unchecked(block) };
+
+            let max_possible_bits_to_add = if start_block == block {
+                if rem == 0 {
+                    continue;
+                }
+
+                let max_bits = rem;
+
+                // Shift `elt` so we can count the leading bits from the relevant part only.
+                elt = C::shift_element_lower_for_count(elt, rem);
+
+                // Only the first block can have a remainder, because every other block needs to
+                // check the whole block.
+                rem = 0;
+
+                max_bits
+            } else {
+                BITS_U32
+            };
+
+            let element_count = C::count_leading(elt);
+
+            count += element_count as usize;
+
+            if element_count != max_possible_bits_to_add {
+                // We found a toggled bit that ended the run.
+                break;
+            }
+        }
+
+        count
+    }
+
+    fn count_consecutive_higher_inner<C: CountConsecutiveBits>(&self, start: usize) -> usize {
+        assert!(
+            start < self.length,
+            "count_consecutive_ones_higher at index {} exceeds fixedbitset size {}",
+            start,
+            self.length
+        );
+
+        const BITS_U32: u32 = BITS as u32;
+
+        let (start_block, start_rem) = div_rem(start, BITS);
+        let mut count = 0;
+        let mut rem = start_rem as u32;
+
+        for block in start_block..self.usize_len() {
+            // SAFETY: Start is in range, so block index is also in range.
+            let mut elt = unsafe { *self.get_unchecked(block) };
+
+            let max_possible_bits_to_add = if start_block == block {
+                if rem == 0 {
+                    BITS_U32
+                } else {
+                    let max_bits = BITS_U32 - rem;
+
+                    // Shift `elt` so we can count the trailing bits from the relevant part only.
+                    elt = C::shift_element_higher_for_count(elt, rem);
+
+                    // Only the first block can have a remainder, because every other block needs to
+                    // check the whole block.
+                    rem = 0;
+
+                    max_bits
+                }
+            } else {
+                BITS_U32
+            };
+
+            let element_count = C::count_trailing(elt);
+
+            count += element_count as usize;
+
+            if element_count != max_possible_bits_to_add {
+                // We found a toggled bit that ended the run.
+                break;
+            }
+        }
+
+        count
+    }
+
+    /// Count the number of unset bits from `start` to the first lower set bit.
+    ///
+    /// **Panics** if `start` is out of bounds.
+    pub fn count_consecutive_zero_run_lower(&self, start: usize) -> usize {
+        self.count_consecutive_lower_inner::<CountConsecutiveZeroBits>(start)
+    }
+
+    /// Count the number of unset bits from `start` to the first higher set bit.
+    ///
+    /// **Panics** if `start` is out of bounds.
+    pub fn count_consecutive_zero_run_higher(&self, start: usize) -> usize {
+        self.count_consecutive_higher_inner::<CountConsecutiveZeroBits>(start)
+    }
+
+    /// Count the number of set bits from `start` to the first lower unset bit.
+    ///
+    /// **Panics** if `start` is out of bounds.
+    pub fn count_consecutive_one_run_lower(&self, start: usize) -> usize {
+        self.count_consecutive_lower_inner::<CountConsecutiveOneBits>(start)
+    }
+
+    /// Count the number of set bits from `start` to the first higher unset bit.
+    ///
+    /// **Panics** if `start` is out of bounds.
+    pub fn count_consecutive_one_run_higher(&self, start: usize) -> usize {
+        self.count_consecutive_higher_inner::<CountConsecutiveOneBits>(start)
     }
 
     /// Sets every bit in the given range to the given state (`enabled`)
@@ -1707,5 +1840,64 @@ impl BitXorAssign for FixedBitSet {
 impl BitXorAssign<&Self> for FixedBitSet {
     fn bitxor_assign(&mut self, other: &Self) {
         self.symmetric_difference_with(other);
+    }
+}
+
+trait CountConsecutiveBits {
+    fn count_leading(element: usize) -> u32;
+    fn count_trailing(element: usize) -> u32;
+    fn shift_element_lower_for_count(element: usize, rem: u32) -> usize;
+    fn shift_element_higher_for_count(element: usize, rem: u32) -> usize;
+}
+
+struct CountConsecutiveZeroBits;
+
+impl CountConsecutiveBits for CountConsecutiveZeroBits {
+    #[inline]
+    fn count_leading(element: usize) -> u32 {
+        element.leading_zeros()
+    }
+
+    #[inline]
+    fn count_trailing(element: usize) -> u32 {
+        element.trailing_zeros()
+    }
+
+    #[inline]
+    fn shift_element_lower_for_count(element: usize, rem: u32) -> usize {
+        // Pad with one on the right.
+        element.wrapping_shl(BITS_U32 - rem) | usize::MAX.wrapping_shr(rem)
+    }
+
+    #[inline]
+    fn shift_element_higher_for_count(element: usize, rem: u32) -> usize {
+        // Pad with one on the left.
+        element.wrapping_shr(rem) | usize::MAX.wrapping_shl(BITS_U32 - rem)
+    }
+}
+
+struct CountConsecutiveOneBits;
+
+impl CountConsecutiveBits for CountConsecutiveOneBits {
+    #[inline]
+    fn count_leading(element: usize) -> u32 {
+        element.leading_ones()
+    }
+
+    #[inline]
+    fn count_trailing(element: usize) -> u32 {
+        element.trailing_ones()
+    }
+
+    #[inline]
+    fn shift_element_lower_for_count(element: usize, rem: u32) -> usize {
+        // Pad with zero on the right.
+        element.wrapping_shl(BITS_U32 - rem)
+    }
+
+    #[inline]
+    fn shift_element_higher_for_count(element: usize, rem: u32) -> usize {
+        // Pad with zero on the left.
+        element.wrapping_shr(rem)
     }
 }

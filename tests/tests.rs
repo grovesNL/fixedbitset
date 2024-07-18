@@ -1311,3 +1311,67 @@ fn clone() {
     assert_eq!(&fb, &fb_clone_from_same);
     assert_eq!(&fb, &fb_clone_from_bigger);
 }
+
+#[test]
+fn count_consecutive_zero_run_lower() {
+    let mut fb = FixedBitSet::with_capacity(1000);
+
+    fb.insert_range(14..346);
+    fb.insert_range(453..632);
+
+    assert_eq!(fb.count_consecutive_zero_run_lower(5), 6);
+    assert_eq!(fb.count_consecutive_zero_run_lower(346), 1);
+    assert_eq!(fb.count_consecutive_zero_run_lower(452), 107);
+    assert_eq!(fb.count_consecutive_zero_run_lower(453), 0);
+    assert_eq!(fb.count_consecutive_zero_run_lower(620), 0);
+}
+
+#[test]
+fn count_consecutive_zero_run_lower_at_boundary() {
+    let fb = FixedBitSet::with_capacity(256);
+    assert_eq!(fb.count_consecutive_zero_run_lower(127), 128);
+}
+
+#[test]
+fn count_consecutive_zero_run_higher() {
+    let mut fb = FixedBitSet::with_capacity(1000);
+
+    fb.insert_range(14..346);
+    fb.insert_range(453..632);
+
+    assert_eq!(fb.count_consecutive_zero_run_higher(12), 2);
+    assert_eq!(fb.count_consecutive_zero_run_higher(346), 107);
+    assert_eq!(fb.count_consecutive_zero_run_higher(452), 1);
+    assert_eq!(fb.count_consecutive_zero_run_higher(453), 0);
+    assert_eq!(fb.count_consecutive_zero_run_higher(620), 0);
+}
+
+#[test]
+fn count_consecutive_zero_run_higher_at_boundary() {
+    let fb = FixedBitSet::with_capacity(256);
+    assert_eq!(fb.count_consecutive_zero_run_higher(64), 192);
+}
+
+#[test]
+fn count_consecutive_one_run_lower() {
+    let mut fb = FixedBitSet::with_capacity(1000);
+
+    fb.insert_range(14..346);
+
+    assert_eq!(fb.count_consecutive_one_run_lower(17), 4);
+    assert_eq!(fb.count_consecutive_one_run_lower(135), 122);
+    assert_eq!(fb.count_consecutive_one_run_lower(2), 0);
+    assert_eq!(fb.count_consecutive_one_run_lower(500), 0);
+}
+
+#[test]
+fn count_consecutive_one_run_higher() {
+    let mut fb = FixedBitSet::with_capacity(1000);
+
+    fb.insert_range(14..346);
+
+    assert_eq!(fb.count_consecutive_one_run_higher(343), 3);
+    assert_eq!(fb.count_consecutive_one_run_higher(17), 329);
+    assert_eq!(fb.count_consecutive_one_run_higher(2), 0);
+    assert_eq!(fb.count_consecutive_one_run_higher(500), 0);
+}
